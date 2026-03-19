@@ -7,7 +7,7 @@ services:
       context: ./application
     container_name: laravel_app
     ports:
-      - "8001:8000"
+      - "8000:8000"
     volumes:
       - ./application:/var/www/html
     depends_on:
@@ -22,7 +22,7 @@ services:
       context: ./ai-service
     container_name: ai_service
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file:
       - ./ai-service/.env
 
