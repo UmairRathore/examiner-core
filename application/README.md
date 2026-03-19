@@ -1,74 +1,85 @@
 # AI Examiner Core — Backend Platform
 
-A production-oriented backend system for an AI-powered answer evaluation platform (O/A Levels).
-This repository contains the core API, orchestration layer, and infrastructure setup.
-The AI inference engine is isolated in a separate private service.
+A backend system for processing structured answer evaluations using an AI-assisted architecture.
 
-## 🧠 System Architecture
+This repository contains the API layer, orchestration logic, and infrastructure setup.
+The evaluation engine is implemented as a separate private service.
 
-This project follows a service-separated architecture:
+## 🧠 Architecture Overview
+
+The system follows a service-separated design:
+
 ```
-Client → Laravel API (this repo) → AI Engine (private service)
+Client → Laravel API → Evaluation Service (private)
 ```
 
-### Responsibilities
-**examiner-core (this repository)**
-- Request validation
-- API endpoints
-- Answer submission pipeline
-- Queue & job orchestration
-- Response formatting (marks, feedback, missing points)
+This separation ensures scalability, maintainability, and isolation of core evaluation logic.
 
-**AI Engine (private repository)**
-- Model inference
-- Evaluation logic
-- Prompt pipelines
-- Marking scheme processing
+## ⚙️ Responsibilities
 
-## ⚙️ Core Features
+### Core API (this repository)
+- Request validation and normalization
+- Evaluation request orchestration
+- Queue/job dispatching
+- Response aggregation and formatting
+- Caching and lifecycle management
 
-- Structured answer evaluation pipeline
-- Modular controller → service → job architecture
+### Evaluation Service (private)
+- AI-based processing
+- Internal scoring logic
+- Domain-specific evaluation pipelines
+
+## ⚙️ Core Capabilities
+
+- Modular backend architecture (Controller → Service → Job)
 - Queue-based processing (async-ready)
 - Redis-backed caching support
-- Dockerized environment for reproducibility
-- Clean separation between API and AI logic
+- Dockerized development environment
+- Clean service-to-service integration pattern
 
-## 🧩 Example Flow
+## 🧩 Request Flow (Simplified)
 
 ```
-POST /api/evaluate-answer
-
+POST /api/evaluate
 → Validate input
-→ Dispatch evaluation job
-→ Send request to AI engine
-→ Process structured response
-→ Return marks + feedback
+→ Dispatch processing job
+→ Communicate with evaluation service
+→ Aggregate result
+→ Return structured response
 ```
 
-## 🐳 Local Development (Docker)
+## 🐳 Local Development
 
 ```bash
 docker-compose up -d
 ```
 
-Application runs at:
+Application:
 http://localhost:8001
 
-## 🔐 Security & Architecture Notes
+## 🔐 Design Notes
 
-- AI logic is intentionally not included in this repository
-- Environment variables are excluded via .gitignore
-- System designed for scalability and service isolation
+- Core evaluation logic is intentionally not included
+- No sensitive configuration is committed
+- System is designed for horizontal scalability
+- Clear boundary between orchestration and processing layers
 
-## 🚀 Roadmap
+## 🚀 Roadmap (High-Level)
 
-**Phase 1**: Physics answer evaluator (MVP)
-**Phase 2**: Multi-question evaluation support
-**Phase 3**: Subject expansion (Math, CS, Chemistry)
-**Phase 4**: Personalized AI tutor system
+- Initial evaluation workflows (MVP)
+- Multi-input evaluation support
+- Extended domain coverage
+- Advanced feedback systems
+
+## 🧠 Engineering Focus
+
+This project highlights:
+- Backend architecture for AI-integrated systems
+- Service isolation patterns
+- Queue-driven processing pipelines
+- API-first design for scalable products
 
 ## 👨‍💻 Author
 
 **Umair Rathore**
-Backend Engineer — Laravel, APIs, AI Systems
+Backend & AI Systems Engineer — FastAPI, Laravel, LLM Pipelines, Distributed Systems
