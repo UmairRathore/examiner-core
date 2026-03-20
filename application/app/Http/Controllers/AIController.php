@@ -10,7 +10,7 @@ class AIController extends Controller
     public function evaluate(Request $request)
     {
         $response = Http::post('http://ai-service:8000/evaluate', [
-            'answer' => $request->input('answer', 'test answer')
+            'question' => $request->input('question', 'What is Newtons second law?')
         ]);
 
         return response()->json($response->json());

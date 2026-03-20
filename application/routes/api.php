@@ -13,7 +13,7 @@ Route::get('/redis-test', function () {
 });
 Route::get('/ai-test', function () {
     $response = Http::post('http://ai-service:8000/evaluate', [
-        'answer' => 'Test answer'
+        'question' => 'What is Newtons second law?'
     ]);
 
     return $response->json();
