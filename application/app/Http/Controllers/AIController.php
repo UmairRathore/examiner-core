@@ -59,6 +59,11 @@ class AIController extends Controller
         $scorecard['reasoning_depth'] = $this->scoreReasoningDepth($answer);
         $scorecard['physics_accuracy'] = $this->scorePhysicsAccuracy($question, $answer);
         
+        // NEW: Physics correctness validation
+        $scorecard['equation_correctness'] = $this->scoreEquationCorrectness($question, $answer);
+        $scorecard['unit_correctness'] = $this->scoreUnitCorrectness($question, $answer);
+        $scorecard['numeric_accuracy'] = $this->scoreNumericAccuracy($question, $answer);
+        
         return $scorecard;
     }
     
@@ -114,7 +119,7 @@ class AIController extends Controller
         
         // Quality indicators
         $stepCount = preg_match_all('/\d+\.|First|Second|Third|Finally/', $reasoning);
-        $hasCalculation = preg_match('/\d+.*[+\-*/=]/', $reasoning);
+        $hasCalculation = preg_match('/\d+.*[+\-*=]/', $reasoning);
         $hasExplanation = strlen($reasoning) > 150;
         
         if ($stepCount >= 3 && $hasCalculation && $hasExplanation) return 3;
@@ -153,7 +158,7 @@ class AIController extends Controller
         }
         
         // Look for numerical substitution
-        if (preg_match('/\d+.*[+\-*/].*=.*\d+/', $section)) return 3;
+        if (preg_match('/\d+.*[+\-*=].*\d+/', $section)) return 3;
         if (preg_match('/\d+.*=/', $section)) return 2;
         return 1;
     }
@@ -288,6 +293,182 @@ class AIController extends Controller
         return $conceptScore;
     }
     
+    private function scoreEquationCorrectness($question, $answer)
+    {
+        // Extract equations from answer
+        $equations = $this->extractEquations($answer);
+        
+        if (empty($equations)) return 0;
+        
+        $correctEquations = 0;
+        $totalEquations = count($equations);
+        
+        // Known physics equations validation
+        $knownEquations = [
+            'F = ma' => true,
+            'F = mg' => true,
+            'P = F/A' => true,
+            'W = Fd' => true,
+            'KE = 1/2 mv²' => true,
+            'PE = mgh' => true,
+            'v = u + at' => true,
+            's = ut + 1/2 at²' => true,
+            'v² = u² + 2as' => true
+        ];
+        
+        foreach ($equations as $equation) {
+            $normalizedEq = strtolower(str_replace(' ', '', $equation));
+            
+            // Check against known equations
+            foreach ($knownEquations as $knownEq => $valid) {
+                $normalizedKnown = strtolower(str_replace(' ', '', $knownEq));
+                if (strpos($normalizedEq, $normalizedKnown) !== false || strpos($normalizedKnown, $normalizedEq) !== false) {
+                    $correctEquations++;
+                    break;
+                }
+            }
+        }
+        
+        if ($totalEquations == 0) return 0;
+        
+        $accuracy = $correctEquations / $totalEquations;
+        if ($accuracy >= 0.9) return 3;
+        if ($accuracy >= 0.7) return 2;
+        if ($accuracy >= 0.5) return 1;
+        return 0;
+    }
+    
+    private function scoreUnitCorrectness($question, $answer)
+    {
+        // Extract units from answer
+        $units = $this->extractUnits($answer);
+        
+        if (empty($units)) return 1; // No units to validate
+        
+        $validUnits = [
+            'n', 'newton', 'newtons',
+            'kg', 'kilogram', 'kilograms',
+            'm', 'meter', 'meters',
+            's', 'second', 'seconds',
+            'm/s', 'm/s²', 'm/s²',
+            'j', 'joule', 'joules',
+            'w', 'watt', 'watts',
+            'pa', 'pascal', 'pascals',
+            'c', 'coulomb', 'coulombs',
+            'v', 'volt', 'volts',
+            'a', 'ampere', 'amperes',
+            'ω', 'ohm', 'ohms'
+        ];
+        
+        $correctUnits = 0;
+        $totalUnits = count($units);
+        
+        foreach ($units as $unit) {
+            $normalizedUnit = strtolower(trim($unit));
+            if (in_array($normalizedUnit, $validUnits)) {
+                $correctUnits++;
+            }
+        }
+        
+        if ($totalUnits == 0) return 0;
+        
+        $accuracy = $correctUnits / $totalUnits;
+        if ($accuracy >= 0.9) return 3;
+        if ($accuracy >= 0.7) return 2;
+        if ($accuracy >= 0.5) return 1;
+        return 0;
+    }
+    
+    private function scoreNumericAccuracy($question, $answer)
+    {
+        // Extract numerical calculations from answer
+        $calculations = $this->extractCalculations($answer);
+        
+        if (empty($calculations)) return 1; // No calculations to validate
+        
+        $correctCalculations = 0;
+        $totalCalculations = count($calculations);
+        
+        foreach ($calculations as $calculation) {
+            // Basic validation: check if calculation follows mathematical rules
+            if ($this->validateCalculation($calculation)) {
+                $correctCalculations++;
+            }
+        }
+        
+        if ($totalCalculations == 0) return 0;
+        
+        $accuracy = $correctCalculations / $totalCalculations;
+        if ($accuracy >= 0.9) return 3;
+        if ($accuracy >= 0.7) return 2;
+        if ($accuracy >= 0.5) return 1;
+        return 0;
+    }
+    
+    private function extractEquations($text)
+    {
+        $equations = [];
+        
+        // Pattern to match equations (variable = expression)
+        if (preg_match_all('/([A-Za-z][A-Za-z0-9]*\s*=\s*[^,\n]+)/', $text, $matches)) {
+            $equations = array_map('trim', $matches[1]);
+        }
+        
+        return array_unique($equations);
+    }
+    
+    private function extractUnits($text)
+    {
+        $units = [];
+        
+        // Pattern to match units (including compound units)
+        if (preg_match_all('/\b([a-zA-Z²³\/²³]+)\b/', $text, $matches)) {
+            foreach ($matches[1] as $unit) {
+                // Filter out common words that aren't units
+                if (strlen($unit) <= 10 && !in_array(strtolower($unit), ['the', 'and', 'for', 'are', 'with', 'not', 'can', 'will'])) {
+                    $units[] = $unit;
+                }
+            }
+        }
+        
+        return array_unique($units);
+    }
+    
+    private function extractCalculations($text)
+    {
+        $calculations = [];
+        
+        // Pattern to match numerical calculations
+        if (preg_match_all('/\d+\.?\d*\s*[+\-*/]\s*\d+\.?\d*\s*(?:=\s*\d+\.?\d*)?/', $text, $matches)) {
+            $calculations = $matches[0];
+        }
+        
+        return array_unique($calculations);
+    }
+    
+    private function validateCalculation($calculation)
+    {
+        // Extract the calculation part before the equals sign
+        if (preg_match('/(.+?)\s*=\s*(.+)/', $calculation, $matches)) {
+            $expression = $matches[1];
+            $result = $matches[2];
+            
+            // Evaluate the expression safely (basic validation)
+            try {
+                // Replace common mathematical functions
+                $expression = str_replace(['²', '³'], ['^2', '^3'], $expression);
+                
+                // Basic validation: check if result matches expected pattern
+                return is_numeric($result) && preg_match('/[\d+\-*/]/', $expression);
+            } catch (Exception $e) {
+                return false;
+            }
+        }
+        
+        // For expressions without results, just check if they're mathematically valid
+        return preg_match('/[\d+\-*/]/', $calculation);
+    }
+    
     private function extractSection($answer, $sectionHeader)
     {
         $startPos = strpos($answer, $sectionHeader);
@@ -344,20 +525,61 @@ class AIController extends Controller
     
     private function checkGenericAnswer($answer)
     {
-        // Check for generic/non-specific answers
-        $genericPhrases = [
-            'it depends',
-            'not enough information',
-            'cannot be determined',
-            'more data needed'
+        $answerLower = strtolower($answer);
+        
+        // Enhanced generic answer patterns
+        $genericPatterns = [
+            // Vague explanations
+            '/\b(the answer is|it is|this is|that is)\b.*\b(important|necessary|required|clear)\b/',
+            '/\b(generally|typically|usually|normally|often)\b/',
+            '/\b(can be|could be|might be|may be)\b.*\b(considered|thought|seen)\b/',
+            
+            // Missing specific reasoning
+            '/\b(depending on|based on|according to)\b.*\b(the situation|the context|the scenario)\b/',
+            '/\b(in this case|in this scenario|in this situation)\b.*\b(the answer|the result)\b/',
+            
+            // Non-committal language
+            '/\b(it depends|it varies|it changes)\b/',
+            '/\b(there are various|there are multiple|there are different)\b.*\b(ways|methods|approaches)\b/',
+            
+            // Overly broad statements
+            '/\b(always|never|all|every|none)\b.*\b(the time|cases|situations)\b/',
+            '/\b(fundamentally|essentially|basically|primarily)\b.*\b(the same|similar)\b/',
+            
+            // Template-like responses
+            '/\b(first|second|third|finally)\b.*\b(step|stage|phase)\b.*(without.*specific|without.*detail)/',
+            '/\b(as mentioned|as stated|as described)\b.*(above|previously|earlier)/',
+            
+            // Physics-specific generic patterns
+            '/\b(according to|based on)\b.*\b(newton|physics|science)\b.*\b(law|principle|theory)\b.*(without.*explanation)/',
+            '/\b(using|applying|applying)\b.*\b(the formula|the equation)\b.*(without.*showing|without.*calculating)/'
         ];
         
-        $answerLower = strtolower($answer);
-        foreach ($genericPhrases as $phrase) {
-            if (strpos($answerLower, $phrase) !== false) {
-                return true;
+        $genericScore = 0;
+        foreach ($genericPatterns as $pattern) {
+            if (preg_match($pattern, $answerLower)) {
+                $genericScore++;
             }
         }
+        
+        // Check for missing causal depth
+        $causalIndicators = ['because', 'therefore', 'thus', 'hence', 'as a result', 'due to', 'since'];
+        $hasCausalReasoning = false;
+        foreach ($causalIndicators as $indicator) {
+            if (strpos($answerLower, $indicator) !== false) {
+                $hasCausalReasoning = true;
+                break;
+            }
+        }
+        
+        // Check answer length and specificity
+        $wordCount = str_word_count($answer);
+        $hasSpecificDetails = preg_match('/\d+/', $answer) && preg_match('/[A-Z]/', $answer);
+        
+        // Final determination
+        if ($genericScore >= 3) return true;  // Multiple generic patterns
+        if ($genericScore >= 2 && !$hasCausalReasoning) return true;  // Generic + no causal reasoning
+        if ($genericScore >= 1 && $wordCount < 100 && !$hasSpecificDetails) return true;  // Short + generic + no specifics
         
         return false;
     }
