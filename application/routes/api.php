@@ -7,6 +7,13 @@ use App\Http\Controllers\AIController;
 
 Route::get('/test', [AIController::class, 'test']);
 Route::post('/evaluate', [AIController::class, 'evaluate']);
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'healthy',
+        'service' => 'Laravel Scorer',
+        'timestamp' => now()
+    ]);
+});
 Route::get('/redis-test', function () {
     \Illuminate\Support\Facades\Cache::put('test', 'working', 60);
     return \Illuminate\Support\Facades\Cache::get('test');
